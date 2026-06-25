@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A productivity task representing a deadline to beat",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "deadline": { "type": "string" },
+        "priority": { "type": "string" },
+        "category": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "completedAt": { "type": "string" },
+        "onTime": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "deadline", "priority", "category"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "A habit to build consistency and beat procrastination",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "frequency": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "frequency"]
+    },
+    "HabitLog": {
+      "title": "HabitLog",
+      "description": "A completion log entry for a specific habit on a given date",
+      "type": "object",
+      "properties": {
+        "habitId": { "type": "string" },
+        "date": { "type": "string" },
+        "done": { "type": "boolean" },
+        "loggedAt": { "type": "string" }
+      },
+      "required": ["habitId", "date", "done"]
+    },
+    "Stats": {
+      "title": "Stats",
+      "description": "Weekly productivity stats for the user",
+      "type": "object",
+      "properties": {
+        "completedThisWeek": { "type": "integer" },
+        "totalCompleted": { "type": "integer" },
+        "onTimeCount": { "type": "integer" },
+        "lateCount": { "type": "integer" },
+        "currentStreak": { "type": "integer" },
+        "lastCompletedDate": { "type": "string" }
+      },
+      "required": ["completedThisWeek", "totalCompleted", "onTimeCount", "lateCount", "currentStreak", "lastCompletedDate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User's tasks collection"
+    },
+    "/users/{userId}/habits/{habitId}": {
+      "schema": "Habit",
+      "description": "User's habits collection"
+    },
+    "/users/{userId}/habitLogs/{logId}": {
+      "schema": "HabitLog",
+      "description": "User's habit completion logs"
+    },
+    "/users/{userId}/stats/{statId}": {
+      "schema": "Stats",
+      "description": "User's productivity statistics summary"
+    }
+  }
+}
