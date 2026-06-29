@@ -10,6 +10,14 @@
   <img src="https://img.shields.io/badge/Gemini_2.0_Flash-8E75C2?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Gemini AI" />
 </p>
 
+<p align="center">
+  <a href="https://the-last-minute-life-saver-971938524832.us-west1.run.app" target="_blank">
+    <img src="https://img.shields.io/badge/Live_App-Demo-0284c7?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Live Demo" />
+  </a>
+</p>
+
+<p align="center">🌐 <b>Live Application Link:</b> <a href="https://the-last-minute-life-saver-971938524832.us-west1.run.app" target="_blank">https://the-last-minute-life-saver-971938524832.us-west1.run.app</a></p>
+
 ---
 
 ## 📝 Project Description
