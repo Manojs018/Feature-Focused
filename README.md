@@ -31,6 +31,7 @@
 - ⚡ **AI Task Prioritization**: Automatic task sorting based on a dynamic priority algorithm balancing deadline urgency, user energy levels, and assignment gravity.
 - 📬 **Gmail Auto-Pilot Detection**: Instant unread email querying that automatically scans and parses incoming instructions or assignments into actual tasks.
 - 📁 **Google Drive Co-Pilot**: Link your storage files securely using Google OAuth to summarize long project documentation and extract deadlines with a single click.
+- 📅 **Google Calendar Co-Pilot**: Seamlessly integrate your agenda, view busy times, and let Gemini AI auto-schedule customized 1.5-hour focus blocks for outstanding tasks inside empty slots.
 - 🤖 **Gemini Chat Assistant**: An interactive study buddy and coach. Ask for exam schedules, quick concept summaries, or customized stress relief plans.
 - 🌸 **Habit & Streak Logs**: Create custom repeating habits with satisfying daily streak updates to remain motivated and build long-term positive routines.
 - 🚨 **Push Notifications & Overlays**: Real-time browser notifications and focus overlay tools designed to draw your attention back to urgent priorities.

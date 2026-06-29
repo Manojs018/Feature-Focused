@@ -556,3 +556,56 @@ export async function disconnectDrive(uid: string) {
   }
 }
 
+// Google Calendar Connection & Syncing helpers
+export async function saveCalendarConnection(uid: string, calendarData: { accessToken: string; email: string; connectedAt: string }) {
+  if (await useFirestore()) {
+    try {
+      const ref = adminDb.collection("users").doc(uid);
+      await ref.set({ calendarConnection: calendarData }, { merge: true });
+      return;
+    } catch (error: any) {
+      // Graceful local fallback
+    }
+  }
+
+  const db = loadLocalDb();
+  if (!db.users[uid]) db.users[uid] = {};
+  db.users[uid].calendarConnection = calendarData;
+  saveLocalDb(db);
+}
+
+export async function getCalendarConnection(uid: string) {
+  if (await useFirestore()) {
+    try {
+      const doc = await adminDb.collection("users").doc(uid).get();
+      if (doc.exists) {
+        const data = doc.data();
+        return data?.calendarConnection || null;
+      }
+    } catch (error: any) {
+      // Graceful local fallback
+    }
+  }
+
+  const db = loadLocalDb();
+  return db.users[uid]?.calendarConnection || null;
+}
+
+export async function disconnectCalendar(uid: string) {
+  if (await useFirestore()) {
+    try {
+      const ref = adminDb.collection("users").doc(uid);
+      await ref.set({ calendarConnection: null }, { merge: true });
+      return;
+    } catch (error: any) {
+      // Graceful local fallback
+    }
+  }
+
+  const db = loadLocalDb();
+  if (db.users[uid]) {
+    db.users[uid].calendarConnection = null;
+    saveLocalDb(db);
+  }
+}
+

@@ -16,6 +16,7 @@ import GoogleLogin from "./components/Auth/GoogleLogin";
 // Pages
 import Dashboard from "./pages/Dashboard";
 import GoogleDrive from "./pages/GoogleDrive";
+import GoogleCalendar from "./pages/GoogleCalendar";
 import AIAssistant from "./pages/AIAssistant";
 import Goals from "./pages/Goals";
 import Insights from "./pages/Insights";
@@ -145,6 +146,10 @@ export default function App() {
 
           {activeTab === "drive" && (
             <GoogleDrive addTask={addTask} />
+          )}
+
+          {activeTab === "calendar" && (
+            <GoogleCalendar tasks={tasks} />
           )}
 
           {activeTab === "assistant" && (
