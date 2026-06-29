@@ -1,5 +1,5 @@
 import React from "react";
-import { LayoutDashboard, MessageSquareCode, FlameKindling, BarChart3, LogOut, ShieldAlert, X } from "lucide-react";
+import { LayoutDashboard, MessageSquareCode, FlameKindling, BarChart3, LogOut, ShieldAlert, X, FolderOpen } from "lucide-react";
 
 interface SidebarProps {
   activeTab: string;
@@ -13,6 +13,7 @@ interface SidebarProps {
 export default function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, setIsOpen }: SidebarProps) {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "drive", label: "Google Drive", icon: FolderOpen },
     { id: "assistant", label: "AI Coach Chat", icon: MessageSquareCode },
     { id: "goals", label: "Habits & Goals", icon: FlameKindling },
     { id: "insights", label: "AI Insights", icon: BarChart3 },

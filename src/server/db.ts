@@ -502,3 +502,57 @@ export async function markEmailProcessed(uid: string, messageId: string) {
   db.users[uid].processedEmails[messageId] = { processedAt: new Date().toISOString() };
   saveLocalDb(db);
 }
+
+// Google Drive Connection & Syncing helpers
+export async function saveDriveConnection(uid: string, driveData: { accessToken: string; email: string; connectedAt: string }) {
+  if (await useFirestore()) {
+    try {
+      const ref = adminDb.collection("users").doc(uid);
+      await ref.set({ driveConnection: driveData }, { merge: true });
+      return;
+    } catch (error: any) {
+      // Graceful local fallback
+    }
+  }
+
+  const db = loadLocalDb();
+  if (!db.users[uid]) db.users[uid] = {};
+  db.users[uid].driveConnection = driveData;
+  saveLocalDb(db);
+}
+
+export async function getDriveConnection(uid: string) {
+  if (await useFirestore()) {
+    try {
+      const doc = await adminDb.collection("users").doc(uid).get();
+      if (doc.exists) {
+        const data = doc.data();
+        return data?.driveConnection || null;
+      }
+    } catch (error: any) {
+      // Graceful local fallback
+    }
+  }
+
+  const db = loadLocalDb();
+  return db.users[uid]?.driveConnection || null;
+}
+
+export async function disconnectDrive(uid: string) {
+  if (await useFirestore()) {
+    try {
+      const ref = adminDb.collection("users").doc(uid);
+      await ref.set({ driveConnection: null }, { merge: true });
+      return;
+    } catch (error: any) {
+      // Graceful local fallback
+    }
+  }
+
+  const db = loadLocalDb();
+  if (db.users[uid]) {
+    db.users[uid].driveConnection = null;
+    saveLocalDb(db);
+  }
+}
+

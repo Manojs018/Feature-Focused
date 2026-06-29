@@ -15,6 +15,7 @@ import GoogleLogin from "./components/Auth/GoogleLogin";
 
 // Pages
 import Dashboard from "./pages/Dashboard";
+import GoogleDrive from "./pages/GoogleDrive";
 import AIAssistant from "./pages/AIAssistant";
 import Goals from "./pages/Goals";
 import Insights from "./pages/Insights";
@@ -140,6 +141,10 @@ export default function App() {
                 testNotificationSystem,
               }}
             />
+          )}
+
+          {activeTab === "drive" && (
+            <GoogleDrive addTask={addTask} />
           )}
 
           {activeTab === "assistant" && (
