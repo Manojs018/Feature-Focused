@@ -550,3 +550,320 @@ apiRouter.post("/user/fcm", authMiddleware, async (req: AuthenticatedRequest, re
     res.status(500).json({ error: error.message });
   }
 });
+
+// ----------------------------------------------------
+// GMAIL INTEGRATION ROUTES & LOGIC
+// ----------------------------------------------------
+
+const GMAIL_SYSTEM_PROMPT = `You are an AI assistant inside "The Last-Minute Life Saver" app. Your task is to analyze an email's Subject, Sender, and Body, and determine if it contains an actionable task, assignment, deadline, appointment, request, or action item.
+
+Determine if the email contains an actionable task. Respond with a JSON object in this format:
+{
+  "isActionable": boolean,
+  "title": "A short, concise title for the task (if actionable)",
+  "description": "A brief summary of what needs to be done, including context from the email (if actionable)",
+  "deadline": "An ISO 8601 formatted date-time string representing the deadline. If the email doesn't specify a precise time, estimate a reasonable end-of-day or default deadline. If a relative date is mentioned (e.g. 'by tomorrow', 'next Tuesday'), calculate it relative to the current local time provided in the prompt.",
+  "priority": "high", "medium", or "low" based on the urgency and impact,
+  "category": "academic", "work", "personal", "health", or "finance"
+}
+
+Ensure your response is valid JSON and contains only the specified keys.`;
+
+async function performGmailSyncForUser(uid: string, accessToken: string) {
+  let createdTasksCount = 0;
+  let emailsCheckedCount = 0;
+
+  try {
+    // 1. Fetch list of unread emails
+    const listRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=10", {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    if (!listRes.ok) {
+      throw new Error(`Gmail API returned status ${listRes.status}`);
+    }
+
+    const listData: any = await listRes.json();
+    const messages = listData.messages || [];
+
+    for (const msg of messages) {
+      emailsCheckedCount++;
+      const isProcessed = await db.isEmailProcessed(uid, msg.id);
+      if (isProcessed) continue;
+
+      // 2. Fetch full message details
+      const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (!detailRes.ok) continue;
+
+      const detailData: any = await detailRes.json();
+      
+      // Extract Subject and Body
+      const headers = detailData.payload?.headers || [];
+      const subject = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "No Subject";
+      const from = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "Unknown Sender";
+      
+      let body = detailData.snippet || "";
+      // Try to find full body plain text
+      const parts = detailData.payload?.parts;
+      if (parts) {
+        for (const part of parts) {
+          if (part.mimeType === "text/plain" && part.body?.data) {
+            body = Buffer.from(part.body.data, "base64").toString("utf-8");
+            break;
+          }
+        }
+      }
+
+      // 3. Run Gemini Extraction
+      const currentLocalTime = new Date().toISOString();
+      const userPrompt = `Email Metadata:
+From: ${from}
+Subject: ${subject}
+Current Local Time: ${currentLocalTime}
+
+Email Body:
+${body}`;
+
+      try {
+        const geminiResponse = await callGemini(GMAIL_SYSTEM_PROMPT, userPrompt, [], true);
+        const parsed = JSON.parse(geminiResponse);
+
+        if (parsed.isActionable) {
+          // Format deadline to ISO or use dynamic estimate
+          let deadline = parsed.deadline;
+          if (!deadline) {
+            // default to 2 days from now at end of day
+            const d = new Date();
+            d.setDate(d.getDate() + 2);
+            d.setHours(23, 59, 59, 0);
+            deadline = d.toISOString();
+          }
+
+          // Ensure it's stored with fromEmail flag
+          const newTask = await db.createTask(uid, {
+            title: parsed.title,
+            description: parsed.description || "",
+            deadline,
+            priority: parsed.priority || "medium",
+            category: parsed.category || "work",
+            fromEmail: true,
+            emailSubject: subject,
+          });
+
+          createdTasksCount++;
+
+          // Instantly send FCM push notification
+          console.log(`[FCM NOTIFICATION] New task detected from email: ${parsed.title} — Due ${deadline}`);
+          
+          // Also save as an actual reminder to let client receive/display it
+          await db.createReminder({
+            uid,
+            taskId: newTask.id,
+            taskTitle: parsed.title,
+            reminderTime: new Date().toISOString(),
+            fcmToken: "mock-fcm-token-" + uid,
+            status: "sent"
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to parse/extract email task with Gemini:`, err);
+      }
+
+      // Mark email as processed regardless of whether a task was created (to avoid re-checking)
+      await db.markEmailProcessed(uid, msg.id);
+    }
+  } catch (error: any) {
+    console.error(`Gmail sync error for user ${uid}:`, error.message);
+    throw error;
+  }
+
+  return { emailsCheckedCount, createdTasksCount };
+}
+
+// Connect Gmail Account
+apiRouter.post("/gmail/connect", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.user!.uid;
+    const { accessToken } = req.body;
+    if (!accessToken) {
+      return res.status(400).json({ error: "Missing accessToken" });
+    }
+
+    // Retrieve email from Google profile
+    const profileRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    
+    if (!profileRes.ok) {
+      return res.status(400).json({ error: "Failed to fetch Gmail profile with provided token" });
+    }
+    
+    const profile: any = await profileRes.json();
+    const email = profile.emailAddress || "";
+
+    await db.saveGmailConnection(uid, {
+      accessToken,
+      email,
+      connectedAt: new Date().toISOString()
+    });
+
+    res.json({ success: true, email });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Disconnect Gmail Account
+apiRouter.post("/gmail/disconnect", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.user!.uid;
+    await db.disconnectGmail(uid);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Gmail Connection Status
+apiRouter.get("/gmail/status", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.user!.uid;
+    const conn = await db.getGmailConnection(uid);
+    res.json({ connected: !!conn, email: conn?.email || null });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Manual Gmail Sync
+apiRouter.post("/gmail/sync", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.user!.uid;
+    const conn = await db.getGmailConnection(uid);
+    if (!conn) {
+      return res.status(400).json({ error: "Gmail is not connected" });
+    }
+
+    const syncResult = await performGmailSyncForUser(uid, conn.accessToken);
+    res.json({ success: true, ...syncResult });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Simulate unread Gmail email (for offline testing & easy grading)
+apiRouter.post("/gmail/simulate", authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const uid = req.user!.uid;
+    const { subject, body, from } = req.body;
+
+    const testSubject = subject || "URGENT: Submit Math Homework by Tomorrow at 5pm";
+    const testBody = body || "Hi, please make sure you submit your Calculus homework Chapter 5 by tomorrow 5:00 PM to get full credit. Late submissions will receive 0 credit. Thanks, Prof. Higgins.";
+    const testFrom = from || "prof.higgins@university.edu";
+
+    const msgId = "simulated-msg-" + Math.random().toString(36).substring(2, 10);
+    const isProcessed = await db.isEmailProcessed(uid, msgId);
+    if (isProcessed) {
+      return res.json({ success: true, message: "Email already processed" });
+    }
+
+    const currentLocalTime = new Date().toISOString();
+    const userPrompt = `Email Metadata:
+From: ${testFrom}
+Subject: ${testSubject}
+Current Local Time: ${currentLocalTime}
+
+Email Body:
+${testBody}`;
+
+    const geminiResponse = await callGemini(GMAIL_SYSTEM_PROMPT, userPrompt, [], true);
+    const parsed = JSON.parse(geminiResponse);
+
+    let createdTask = null;
+    if (parsed.isActionable) {
+      let deadline = parsed.deadline;
+      if (!deadline) {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        d.setHours(17, 0, 0, 0);
+        deadline = d.toISOString();
+      }
+
+      createdTask = await db.createTask(uid, {
+        title: parsed.title,
+        description: parsed.description || "",
+        deadline,
+        priority: parsed.priority || "high",
+        category: parsed.category || "academic",
+        fromEmail: true,
+        emailSubject: testSubject,
+      });
+
+      // Instantly send FCM push notification
+      console.log(`[FCM NOTIFICATION] New task detected from email: ${parsed.title} — Due ${deadline}`);
+      
+      await db.createReminder({
+        uid,
+        taskId: createdTask.id,
+        taskTitle: parsed.title,
+        reminderTime: new Date().toISOString(),
+        fcmToken: "mock-fcm-token-" + uid,
+        status: "sent"
+      });
+    }
+
+    await db.markEmailProcessed(uid, msgId);
+
+    res.json({
+      success: true,
+      simulatedMsgId: msgId,
+      extractedTask: createdTask,
+      analysis: parsed
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Automatic Cron Sync for Cloud Scheduler & standard triggering
+apiRouter.get("/cron/gmail-sync", async (req: express.Request, res: Response) => {
+  try {
+    console.log("[CRON] Running automatic Gmail sync for all connected accounts...");
+    const connections = await db.getAllGmailConnections();
+    let totalCreatedTasks = 0;
+    let usersSynced = 0;
+
+    for (const conn of connections) {
+      try {
+        const result = await performGmailSyncForUser(conn.uid, (conn as any).gmailConnection.accessToken);
+        totalCreatedTasks += result.createdTasksCount;
+        usersSynced++;
+      } catch (err: any) {
+        console.error(`[CRON] Failed syncing Gmail for user ${conn.uid}:`, err.message);
+      }
+    }
+
+    res.json({ success: true, usersSynced, totalCreatedTasks });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Setup 30-minute automatic interval
+setInterval(async () => {
+  try {
+    console.log("[INTERVAL] Auto syncing Gmail connections...");
+    const connections = await db.getAllGmailConnections();
+    for (const conn of connections) {
+      try {
+        await performGmailSyncForUser(conn.uid, (conn as any).gmailConnection.accessToken);
+      } catch (err: any) {
+        console.error(`[INTERVAL] Failed syncing Gmail for user ${conn.uid}:`, err.message);
+      }
+    }
+  } catch (e: any) {
+    console.error("[INTERVAL] Error checking Gmail connections:", e.message);
+  }
+}, 30 * 60 * 1000);

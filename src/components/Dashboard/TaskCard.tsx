@@ -26,6 +26,12 @@ export default function TaskCard({ task, onComplete, onDelete, breakdownTask }: 
     return diff > 0 && diff <= 2 * 60 * 60 * 1000;
   })();
 
+  const isWithin24Hours = (() => {
+    if (task.completed || !task.deadline) return false;
+    const diff = new Date(task.deadline).getTime() - new Date().getTime();
+    return diff > 0 && diff <= 24 * 60 * 60 * 1000;
+  })();
+
   const handleBreakdownClick = async () => {
     if (showSubtasks) {
       setShowSubtasks(false);
@@ -58,11 +64,13 @@ export default function TaskCard({ task, onComplete, onDelete, breakdownTask }: 
 
   return (
     <div
-      className={`border rounded-3xl p-6 ${
+      className={`border rounded-3xl p-6 transition-all duration-300 hover:shadow-lg flex flex-col justify-between h-full font-sans ${
         isWithinTwoHours
-          ? "border-rose-400 dark:border-rose-700/60 bg-rose-50/10 dark:bg-rose-950/5 ring-1 ring-rose-400/20 shadow-sm"
+          ? "border-rose-500 dark:border-rose-600 bg-rose-50/15 dark:bg-rose-950/20 ring-2 ring-rose-500/30 shadow-[0_0_18px_rgba(244,63,94,0.3)]"
+          : isWithin24Hours
+          ? "border-rose-300 dark:border-rose-800/70 bg-rose-50/5 dark:bg-rose-950/10 ring-1 ring-rose-400/20 shadow-[0_0_12px_rgba(244,63,94,0.15)]"
           : `${urgencyColors.border} ${urgencyColors.bg}`
-      } transition-all duration-200 hover:shadow-md flex flex-col justify-between h-full font-sans`}
+      }`}
     >
       <div>
         {/* Badges/Context row */}
@@ -93,16 +101,37 @@ export default function TaskCard({ task, onComplete, onDelete, breakdownTask }: 
                 ⚡ {task.cognitiveType}
               </span>
             )}
+            {task.fromEmail && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-extrabold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200/50 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900/30 font-display shadow-sm">
+                <svg className="w-3 h-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                From Email
+              </span>
+            )}
             {isWithinTwoHours && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[9px] font-extrabold uppercase tracking-wider bg-rose-600 text-white dark:bg-rose-700 animate-pulse font-display shadow-sm">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                 Warning: Due Soon
               </span>
             )}
+            {isWithin24Hours && !isWithinTwoHours && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-extrabold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200/50 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/30 font-display shadow-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600 dark:bg-rose-500"></span>
+                </span>
+                Due &lt; 24 Hours
+              </span>
+            )}
           </div>
 
           {!task.completed && (
-            <span className={`text-xs font-bold font-mono tracking-wide ${isWithinTwoHours ? "text-rose-600 dark:text-rose-400" : urgencyColors.text}`}>
+            <span className={`text-xs font-bold font-mono tracking-wide ${
+              isWithinTwoHours || isWithin24Hours 
+                ? "text-rose-600 dark:text-rose-400 font-extrabold" 
+                : urgencyColors.text
+            }`}>
               {countdownText}
             </span>
           )}

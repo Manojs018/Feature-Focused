@@ -27,6 +27,14 @@ export function useTasks(getAuthToken: () => Promise<string>, user: any) {
     fetchTasks();
   }, [userId]);
 
+  useEffect(() => {
+    const handleSync = () => {
+      fetchTasks();
+    };
+    window.addEventListener("gmail-synced", handleSync);
+    return () => window.removeEventListener("gmail-synced", handleSync);
+  }, [userId]);
+
   const addTask = async (taskData: {
     title: string;
     description?: string;

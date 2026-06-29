@@ -67,30 +67,24 @@ async function retryWithBackoffAndFallback(
           JSON.stringify(error).includes("RESOURCE_EXHAUSTED") ||
           JSON.stringify(error).includes("Quota exceeded");
 
-        if (isDailyLimitExceeded || isRateLimited) {
-          console.warn(`Quota or rate limit exceeded for model ${model}. Skipping retries and moving immediately to next model fallback...`);
-          break; // Break the attempts loop to move to the next model immediately
-        }
-
-        const isTransient =
+        const isHighDemand =
           status === 503 ||
           errorMsg.includes("503") ||
           errorMsg.includes("UNAVAILABLE") ||
           errorMsg.includes("high demand") ||
           errorMsg.includes("temporary");
 
-        if (isTransient) {
-          console.warn(`Transient Gemini API error on model ${model}: ${errorMsg}. Retrying in ${currentDelay}ms... (${attempts - 1} attempts left for this model)`);
-          await new Promise((resolve) => setTimeout(resolve, currentDelay));
-          currentDelay *= 2;
-          attempts--;
-        } else {
-          console.error(`Non-transient error on model ${model}:`, error);
-          break; // Move to next model
+        if (isDailyLimitExceeded || isRateLimited || isHighDemand) {
+          console.log(`Model ${model} is rate-limited, overloaded, or unavailable. Skipping retries and moving immediately to next model fallback...`);
+          break; // Break the attempts loop to move to the next model immediately
         }
+
+        // For any other unexpected errors, failover immediately to the next fallback model to preserve uptime
+        console.log(`Expected failover on model ${model}:`, error);
+        break;
       }
     }
-    console.warn(`Model ${model} failed or exhausted retries. Trying next available model in fallback list...`);
+    console.log(`Model ${model} completed attempt. Checking fallback list if needed...`);
   }
 
   throw lastError || new Error("All Gemini models failed to respond");
@@ -153,10 +147,11 @@ export async function callGemini(
 
     // List of models in order of preference for the task.
     // We utilize a highly resilient fallback chain across different model families
-    // (gemini-3.5, gemini-3.1, and gemini-flash) to guarantee service availability
+    // (gemini-3.5, gemini-2.5, gemini-3.1, and gemini-flash) to guarantee service availability
     // and route around any rate limits or high-demand transient errors.
     const models = [
       "gemini-3.5-flash",
+      "gemini-2.5-flash",
       "gemini-3.1-flash-lite",
       "gemini-flash-latest"
     ];

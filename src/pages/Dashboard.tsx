@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Plus, ListFilter, Sparkles, CheckCircle2, ShieldAlert, Search, ChevronDown } from "lucide-react";
 import TodaysBriefing from "../components/AI/TodaysBriefing";
+import DailyProgressRing from "../components/Dashboard/DailyProgressRing";
 import FocusModeBanner from "../components/Dashboard/FocusModeBanner";
 import TaskCard from "../components/Dashboard/TaskCard";
 import AddTaskModal from "../components/Dashboard/AddTaskModal";
 import EmptyState from "../components/Dashboard/EmptyState";
 import EnergyForecast from "../components/Dashboard/EnergyForecast";
+import GmailIntegration from "../components/Dashboard/GmailIntegration";
+import { NotificationSettingsCard } from "../components/Dashboard/NotificationCenter";
 import { sortByUrgency, mergePriorityScores } from "../utils/taskHelpers";
 
 interface DashboardProps {
@@ -19,6 +22,15 @@ interface DashboardProps {
   breakdownTask: (task: any) => Promise<string[]>;
   habits?: any[];
   addHabit?: (habitData: any) => Promise<any>;
+  notificationProps?: {
+    permission: NotificationPermission;
+    notificationsEnabled: boolean;
+    thresholdMinutes: number;
+    requestPermission: () => Promise<NotificationPermission>;
+    updateNotificationsEnabled: (enabled: boolean) => void;
+    updateThresholdMinutes: (minutes: number) => void;
+    testNotificationSystem: () => void;
+  };
 }
 
 export default function Dashboard({
@@ -32,6 +44,7 @@ export default function Dashboard({
   breakdownTask,
   habits = [],
   addHabit,
+  notificationProps,
 }: DashboardProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [aiScores, setAiScores] = useState<any[]>([]);
@@ -116,8 +129,31 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Todays Briefing Banner */}
-      <TodaysBriefing tasks={tasks} getBriefing={getBriefing} />
+      {/* Settings & Integration Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GmailIntegration onSyncComplete={() => window.dispatchEvent(new CustomEvent("gmail-synced"))} />
+        {notificationProps && (
+          <NotificationSettingsCard
+            permission={notificationProps.permission}
+            notificationsEnabled={notificationProps.notificationsEnabled}
+            thresholdMinutes={notificationProps.thresholdMinutes}
+            onRequestPermission={notificationProps.requestPermission}
+            onToggleNotifications={notificationProps.updateNotificationsEnabled}
+            onChangeThreshold={notificationProps.updateThresholdMinutes}
+            onTestNotification={notificationProps.testNotificationSystem}
+          />
+        )}
+      </div>
+
+      {/* Todays Briefing and Daily Progress Ring Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <TodaysBriefing tasks={tasks} getBriefing={getBriefing} />
+        </div>
+        <div>
+          <DailyProgressRing tasks={tasks} />
+        </div>
+      </div>
 
       {/* Cognitive Fatigue & Energy Forecasting */}
       <EnergyForecast tasks={tasks} habits={habits} addHabit={addHabit} />
