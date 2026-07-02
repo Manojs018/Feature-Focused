@@ -163,16 +163,7 @@ gcloud builds submit --tag gcr.io/<YOUR_PROJECT_ID>/last-minute-backend
 gcloud run deploy last-minute-backend --image gcr.io/<YOUR_PROJECT_ID>/last-minute-backend --platform managed --allow-unauthenticated
 ```
 
----
 
-## 📸 Screenshots
-
-<p align="center">
-  <img src="https://via.placeholder.com/800x450/1e293b/ffffff?text=The+Last-Minute+Life+Saver+-+Interactive+Dashboard" width="48%" alt="Dashboard View" />
-  <img src="https://via.placeholder.com/800x450/1e293b/ffffff?text=Google+Drive+Document+Analysis" width="48%" alt="Google Drive Analysis View" />
-</p>
-
----
 
 ## ⚙️ How It Works (The Gmail-to-Task Pipeline)
 
